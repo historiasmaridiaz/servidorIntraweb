@@ -185,7 +185,7 @@ def debug_write(prefix: str, content: str) -> str:
 def cors_headers() -> Dict[str, str]:
     return {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS, HEAD",
         "Access-Control-Allow-Headers": "Content-Type, Access-Control-Request-Private-Network",
         "Access-Control-Allow-Private-Network": "true",
         "Cross-Origin-Resource-Policy": "cross-origin",
@@ -297,6 +297,13 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.send_header(k, v)
         self.end_headers()
 
+    def do_HEAD(self) -> None:  # noqa: N802
+        self.send_response(200)
+        for k, v in cors_headers().items():
+            self.send_header(k, v)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+
     def json_response(self, payload: Dict[str, Any], status: int = 200) -> None:
         body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(status)
@@ -395,7 +402,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 if job.get("status") == "not_found":
                     return self.json_response({"success": False, "status": "not_found", "message": "no encontrado"}, 404)
                 if job.get("status") == "error":
-                    return self.json_response({"success": False, "status": "error", "message": job.get("message") or "Error en búsqueda", "debug_error": job.get("debug_error")}, 500)
+                    return self.json_response({"success": False, "status": "error", "message": job.get("message") or "Error en búsqueda", "debug_error": job.get("debug_error")}, 200)
                 return self.json_response({"success": True, "status": "pending"})
 
             return self.json_response({"success": False, "message": "Ruta no encontrada."}, 404)
@@ -447,13 +454,13 @@ def self_test() -> None:
       <tr><td>CC</td><td>123456</td><td>JUAN PEREZ SANCHEZ</td><td>PROINSALUD EPS</td><td>ACTIVO</td><td>2026-05-14</td></tr>
     </table>
     """
-    rows = INTRANET_MOTOR.extract_table_rows(sample_html)
-    header_data = INTRANET_MOTOR.extract_from_header_rows(rows, "123456")
-    patient = INTRANET_MOTOR.normalize_patient_data(header_data, "123456", "http://test.local")
-    assert patient["cedula"] == "123456"
-    assert patient["nombre"] == "JUAN PEREZ SANCHEZ"
-    assert patient["contrato"] == "PROINSALUD EPS"
-    assert patient["estado"] == "ACTIVO"
+    # Usar la nueva API fiel al original: extract_tables_from_html + patient_from_tables
+    tables = INTRANET_MOTOR.extract_tables_from_html(sample_html)
+    patient = INTRANET_MOTOR.patient_from_tables(tables, "123456", "http://test.local")
+    assert patient["cedula"] == "123456", f"Falló cedula: {patient.get('cedula')}"
+    assert patient["nombre"] == "JUAN PEREZ SANCHEZ", f"Falló nombre: {patient.get('nombre')}"
+    assert patient["contrato"] == "PROINSALUD EPS", f"Falló contrato: {patient.get('contrato')}"
+    assert patient["estado"] == "ACTIVO", f"Falló estado: {patient.get('estado')}"
 
     print("SELF TEST OK - Servidor web y API listos para GitHub / Producción.")
 
@@ -473,7 +480,6 @@ def main() -> None:
     cfg = ensure_config()
     ensure_app_config()
     
-    # Prioridad: argumento CLI -> Variable de entorno PORT/HOST -> Config JSON
     env_port = os.getenv("PORT") or os.getenv("HCLINICAS_API_PORT")
     env_host = os.getenv("HOST") or os.getenv("HCLINICAS_API_HOST")
     
@@ -496,7 +502,6 @@ def main() -> None:
     print("Presione Ctrl+C para detener.")
     print("=" * 75)
 
-    # Abrir navegador solo si no es entorno de nube (sin variable PORT) y no se especificó --no-browser
     is_cloud_env = bool(os.getenv("PORT") or os.getenv("RENDER") or os.getenv("VERCEL"))
     if not args.no_browser and not is_cloud_env:
         threading.Timer(1.0, lambda: webbrowser.open(ui_url)).start()

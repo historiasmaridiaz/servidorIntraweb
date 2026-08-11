@@ -29,7 +29,7 @@ env.bak/
 venv.bak/
 
 # Logs & Debug
-debug/
+debug_intranet/
 *.log
 
 # Archivos del sistema y de IDE
@@ -38,5 +38,13 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Paquetes zip temporales
+# Carpetas generadas
+paquete_win7/
+
+# Paquetes y ejecutables compilados
 *.zip
+*.exe
+*.spec
+
+# PyInstaller
+*.spec
