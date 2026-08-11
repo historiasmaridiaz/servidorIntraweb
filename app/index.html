@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historias Clínicas Proinsalud - Servidor Unificado</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/app/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Navbar -->
+    <header class="navbar">
+      <div class="logo-area">
+        <div class="logo-icon">
+          <i data-lucide="activity"></i>
+        </div>
+        <div class="logo-text">
+          <h1>Historias Clínicas <span>Proinsalud</span></h1>
+          <span class="version-tag" id="appVersionTag">v5.4.0</span>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <div class="status-item" id="serverStatusBadge">
+          <span class="status-dot offline"></span>
+          <span class="status-label">Servidor Local: Conectando...</span>
+        </div>
+        <div class="status-item" id="intranetStatusBadge">
+          <span class="status-dot warning"></span>
+          <span class="status-label">Intranet: Verificando</span>
+        </div>
+        <button class="btn-icon" id="btnOpenConfig" title="Configuración del Servidor">
+          <i data-lucide="settings"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="main-content">
+      <!-- Search Section Panel -->
+      <section class="panel search-panel">
+        <div class="panel-header">
+          <h2><i data-lucide="search"></i> Búsqueda de Paciente</h2>
+          <p class="panel-subtitle">Consulte historias clínicas en tiempo real a través de la red local Proinsalud.</p>
+        </div>
+
+        <form id="searchForm" class="search-form">
+          <div class="form-row">
+            <div class="input-group type-select-group">
+              <label for="tipoDocSelect">Tipo Documento</label>
+              <div class="select-wrapper">
+                <select id="tipoDocSelect" name="tipo">
+                  <option value="CC" selected>CC - Cédula de Ciudadanía</option>
+                  <option value="TI">TI - Tarjeta de Identidad</option>
+                  <option value="CE">CE - Cédula de Extranjería</option>
+                  <option value="RC">RC - Registro Civil</option>
+                  <option value="PA">PA - Pasaporte</option>
+                  <option value="PE">PE - Permiso Especial</option>
+                  <option value="PT">PT - Permiso por Protección</option>
+                  <option value="MS">MS - Menor Sin Identificación</option>
+                  <option value="NV">NV - Nacido Vivo</option>
+                </select>
+                <i data-lucide="chevron-down" class="select-icon"></i>
+              </div>
+            </div>
+
+            <div class="input-group doc-input-group">
+              <label for="documentoInput">Número de Documento</label>
+              <div class="input-wrapper">
+                <i data-lucide="credit-card" class="input-icon"></i>
+                <input type="text" id="documentoInput" placeholder="Ej. 1192899684" autocomplete="off" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="search-actions">
+            <button type="submit" class="btn btn-primary" id="btnBuscar">
+              <i data-lucide="search"></i>
+              <span>Buscar Registro</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="btnLimpiar">
+              <i data-lucide="rotate-ccw"></i>
+              <span>Limpiar</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Loading / Progress State -->
+        <div class="progress-container hidden" id="progressContainer">
+          <div class="progress-bar-wrapper">
+            <div class="progress-bar-fill" id="progressBarFill"></div>
+          </div>
+          <div class="progress-status-text" id="progressStatusText">
+            <i data-lucide="loader" class="spin"></i> Iniciando consulta asincrónicos en Intranet...
+          </div>
+        </div>
+      </section>
+
+      <!-- Result Display Section -->
+      <section class="panel result-panel hidden" id="resultPanel">
+        <div class="panel-header flex-between">
+          <h2><i data-lucide="user-check"></i> Ficha del Paciente</h2>
+          <div class="actions">
+            <button class="btn btn-sm btn-outline" id="btnCopyData">
+              <i data-lucide="copy"></i> Copiar Datos
+            </button>
+          </div>
+        </div>
+
+        <div class="patient-card">
+          <div class="patient-header">
+            <div class="avatar-box">
+              <i data-lucide="user"></i>
+            </div>
+            <div class="patient-main-info">
+              <h3 id="patientNombre">COLIMBA...</h3>
+              <div class="patient-tags">
+                <span class="badge badge-doc" id="patientDocBadge">CC 1192899684</span>
+                <span class="badge badge-status" id="patientEstadoBadge">ACTIVO</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="patient-details-grid">
+            <div class="detail-item">
+              <span class="detail-label"><i data-lucide="shield-check"></i> EPS / Contrato</span>
+              <span class="detail-value" id="patientContrato">PROINSALUD EPS</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label"><i data-lucide="calendar"></i> Última Atención</span>
+              <span class="detail-value highlight" id="patientUltConsulta">2026-07-03</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label"><i data-lucide="stethoscope"></i> Médico / Profesional</span>
+              <span class="detail-value" id="patientMedico">No especificado</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label"><i data-lucide="clock"></i> Edad</span>
+              <span class="detail-value" id="patientEdad">--</span>
+            </div>
+          </div>
+
+          <div class="patient-footer-info" id="patientExtraInfoRow">
+            <span class="meta-item"><i data-lucide="link"></i> Origen: <small id="patientSourceUrl">Intranet Local</small></span>
+            <span class="meta-item"><i data-lucide="zap"></i> Método: <small id="patientMethod">HTTP / Playwright</small></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- History Table Section -->
+      <section class="panel history-panel">
+        <div class="panel-header flex-between">
+          <h2><i data-lucide="history"></i> Historial Reciente de Consultas</h2>
+          <button class="btn btn-sm btn-secondary" id="btnClearHistory">
+            <i data-lucide="trash-2"></i> Limpiar Historial
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="historyTable">
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Documento</th>
+                <th>Nombre del Paciente</th>
+                <th>Contrato</th>
+                <th>Estado</th>
+                <th>Última Atención</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <tr class="empty-row">
+                <td colspan="7">No hay búsquedas realizadas en esta sesión.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Config Modal -->
+    <div class="modal-overlay hidden" id="configModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i data-lucide="sliders"></i> Configuración del Servidor</h3>
+          <button class="btn-close" id="btnCloseConfig">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="configForm">
+            <div class="input-group">
+              <label for="cfgHost">Host Local</label>
+              <input type="text" id="cfgHost" name="host">
+            </div>
+            <div class="input-group">
+              <label for="cfgPort">Puerto Local API</label>
+              <input type="number" id="cfgPort" name="port">
+            </div>
+            <div class="input-group">
+              <label for="cfgWebAppUrl">URL Google Apps Script</label>
+              <input type="url" id="cfgWebAppUrl" name="web_app_url">
+            </div>
+            <div class="input-group">
+              <label for="cfgDriveUrl">URL Google Sheet / Drive</label>
+              <input type="url" id="cfgDriveUrl" name="drive_url">
+            </div>
+
+            <div class="modal-actions">
+              <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+              <button type="button" class="btn btn-secondary" id="btnCancelConfig">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/app.js"></script>
+</body>
+</html>
