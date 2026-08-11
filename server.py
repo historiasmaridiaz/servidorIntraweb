@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Aplicativo local unificado para Historias Clínicas (Proinsalud).
+Aplicativo y Servidor Web Unificado para Historias Clínicas (Proinsalud).
+Diseñado para ejecución independiente en entorno local o despliegue en la nube (Render, Railway, Docker, Vercel).
 
-Endpoints expuestos por el aplicativo:
+Endpoints expuestos por la API:
   GET  /health
   GET  /buscar?documento=123456&tipo=CC
   GET  /buscar_async?documento=123456&tipo=CC
@@ -13,10 +14,7 @@ Endpoints expuestos por el aplicativo:
   GET  /shutdown
   GET  / (y /app/*) -> Interfaz web Dashboard SPA
 
-Diseño v5.4.0:
-- Servidor HTTP con hilos independientes y tareas asincrónicas.
-- Motor de búsqueda con caché en memoria y reconexión automática.
-- Gestión de CORS completo para llamadas locales y externas.
+Diseño v5.4.0 (GitHub & Cloud Ready)
 """
 
 from __future__ import annotations
@@ -48,8 +46,8 @@ except Exception as exc:
     INTRANET_MOTOR_IMPORT_ERROR = str(exc)
 
 APP_VERSION = "5.4.0-extractor-fiel-v416-entidad-fecha"
-DEFAULT_PORT = int(os.getenv("HCLINICAS_API_PORT", "8765"))
-DEFAULT_HOST = os.getenv("HCLINICAS_API_HOST", "127.0.0.1")
+DEFAULT_PORT = int(os.getenv("PORT", os.getenv("HCLINICAS_API_PORT", "8765")))
+DEFAULT_HOST = os.getenv("HOST", os.getenv("HCLINICAS_API_HOST", "127.0.0.1"))
 
 JOBS: Dict[str, Dict[str, Any]] = {}
 JOBS_LOCK = threading.Lock()
@@ -121,8 +119,8 @@ def ensure_config() -> Dict[str, Any]:
             cfg[key] = h
         else:
             cfg[key] = value
-    cfg["port"] = int(os.getenv("HCLINICAS_API_PORT", str(cfg.get("port") or DEFAULT_PORT)))
-    cfg["host"] = os.getenv("HCLINICAS_API_HOST", str(cfg.get("host") or DEFAULT_HOST))
+    cfg["port"] = int(os.getenv("PORT", os.getenv("HCLINICAS_API_PORT", str(cfg.get("port") or DEFAULT_PORT))))
+    cfg["host"] = os.getenv("HOST", os.getenv("HCLINICAS_API_HOST", str(cfg.get("host") or DEFAULT_HOST)))
     return cfg
 
 
@@ -344,7 +342,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 motor_status = INTRANET_MOTOR.dependency_status() if INTRANET_MOTOR else {"available": False}
                 return self.json_response({
                     "success": True,
-                    "message": "Servidor local Historias Clinicas activo",
+                    "message": "Servidor local/Cloud Historias Clinicas activo",
                     "version": APP_VERSION,
                     "host": host,
                     "port": port,
@@ -367,7 +365,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 })
 
             if path == "/shutdown":
-                self.json_response({"success": True, "message": "Cerrando servidor local..."})
+                self.json_response({"success": True, "message": "Cerrando servidor..."})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return
 
@@ -433,6 +431,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         return self.json_response({"success": False, "message": "Endpoint POST no encontrado."}, 404)
 
 
+# Entrada WSGI para servidores Web de Producción como Gunicorn / Vercel
+app = RequestHandler
+
+
 def self_test() -> None:
     print("Iniciando pruebas internas (Self-Test)...")
     doc, tipo = INTRANET_MOTOR.parse_document_input("CC 123456")
@@ -453,14 +455,14 @@ def self_test() -> None:
     assert patient["contrato"] == "PROINSALUD EPS"
     assert patient["estado"] == "ACTIVO"
 
-    print("SELF TEST OK - Motor de extracción y servidores funcionando correctamente.")
+    print("SELF TEST OK - Servidor web y API listos para GitHub / Producción.")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Servidor local Historias Clínicas Proinsalud")
+    parser = argparse.ArgumentParser(description="Servidor Web e Interfaz para Historias Clínicas Proinsalud")
     parser.add_argument("--self-test", action="store_true", help="Ejecuta autodiagnóstico interno")
-    parser.add_argument("--host", default=None, help="Host binding (ej. 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=None, help="Puerto binding (ej. 8765)")
+    parser.add_argument("--host", default=None, help="Host binding (ej. 0.0.0.0 o 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=None, help="Puerto binding (ej. 8080 o 8765)")
     parser.add_argument("--no-browser", action="store_true", help="No abrir navegador automáticamente")
     args = parser.parse_args()
 
@@ -470,8 +472,13 @@ def main() -> None:
 
     cfg = ensure_config()
     ensure_app_config()
-    host = args.host or str(cfg.get("host") or DEFAULT_HOST)
-    port = int(args.port or cfg.get("port") or DEFAULT_PORT)
+    
+    # Prioridad: argumento CLI -> Variable de entorno PORT/HOST -> Config JSON
+    env_port = os.getenv("PORT") or os.getenv("HCLINICAS_API_PORT")
+    env_host = os.getenv("HOST") or os.getenv("HCLINICAS_API_HOST")
+    
+    host = args.host or env_host or str(cfg.get("host") or DEFAULT_HOST)
+    port = int(args.port or (int(env_port) if env_port else None) or cfg.get("port") or DEFAULT_PORT)
     ui_url = f"http://{host}:{port}/"
 
     try:
@@ -481,15 +488,17 @@ def main() -> None:
         return
 
     print("=" * 75)
-    print("Servidor Local Historias Clínicas Proinsalud - Activo")
+    print("Servidor Web Historias Clínicas Proinsalud (GitHub & Cloud Ready)")
     print(f"Versión: {APP_VERSION}")
     print(f"Python: {sys.version.split()[0]} ({'64 bits' if sys.maxsize > 2**32 else '32 bits'})")
-    print(f"Dashboard Web: {ui_url}")
-    print(f"API Health:    {ui_url}health")
+    print(f"URL Servidor Web: {ui_url}")
+    print(f"API Health:       {ui_url}health")
     print("Presione Ctrl+C para detener.")
     print("=" * 75)
 
-    if not args.no_browser:
+    # Abrir navegador solo si no es entorno de nube (sin variable PORT) y no se especificó --no-browser
+    is_cloud_env = bool(os.getenv("PORT") or os.getenv("RENDER") or os.getenv("VERCEL"))
+    if not args.no_browser and not is_cloud_env:
         threading.Timer(1.0, lambda: webbrowser.open(ui_url)).start()
 
     try:
